@@ -1,0 +1,41 @@
+rules:
+  - name: "Folder structure"
+    description: >
+      All features should live under `/app/` in their respective domains.
+      Pages go under `/app/[feature]/page.tsx`.
+      API routes go under `/app/api/[feature]/route.ts`.
+    examples:
+      - Good: `/app/polls/page.tsx`
+      - Good: `/app/api/polls/route.ts`
+      - Bad: `/pages/polls.tsx` (deprecated Next.js 13+ pattern)
+
+  - name: "Forms"
+    description: >
+      Always use `react-hook-form` with `shadcn/ui` components for consistency.
+      Validation must use `zodResolver` and errors must be displayed inline.
+    examples:
+      - Good: Controlled input using `FormField` and `FormMessage`.
+      - Bad: Raw `<input />` without form registration.
+
+  - name: "Supabase Auth"
+    description: >
+      Use Supabase client (`@supabase/auth-helpers-nextjs`) for login/signup/logout.
+      Do not manually handle JWTs or tokens. Use hooks like `useSupabaseClient()` and `useUser()`.
+    examples:
+      - Good: `supabase.auth.signInWithPassword({ email, password })`
+      - Bad: Custom fetch to Supabase REST API with manual headers.
+
+  - name: "Database queries"
+    description: >
+      Always scope queries to the authenticated user (`user.id`) where applicable.
+      Use server components or API routes for database interactions, not client components.
+    examples:
+      - Good: `const { data } = await supabase.from('polls').select('*').eq('user_id', user.id)`
+      - Bad: Client-side fetching directly inside a form component.
+
+  - name: "Poll creation workflow"
+    description: >
+      New poll creation must:
+      1. Insert poll into `polls` table with `user_id`.
+      2. Insert related options into `poll_options` table.
+      3. Return poll_id for redirect and QR code generation.
