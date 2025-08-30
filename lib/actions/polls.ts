@@ -285,3 +285,92 @@ export async function getPollById(pollId: string) {
     };
   }
 }
+
+export async function submitVote(voteData: {
+  poll_id: string;
+  option_ids: string[];
+  voter_name?: string;
+  voter_email?: string;
+}) {
+  try {
+    const supabase = await createClient();
+    
+    // Get the current user (optional)
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    // Check if poll exists and is active
+    const { data: poll, error: pollError } = await supabase
+      .from('polls')
+      .select('status, expires_at, allow_multiple_votes')
+      .eq('id', voteData.poll_id)
+      .single();
+
+    if (pollError || !poll) {
+      throw new Error('Poll not found');
+    }
+
+    // Check if poll is active and not expired
+    if (poll.status !== 'active') {
+      throw new Error('Poll is not active');
+    }
+
+    if (poll.expires_at && new Date(poll.expires_at) < new Date()) {
+      throw new Error('Poll has expired');
+    }
+
+    // Validate options exist and belong to the poll
+    const { data: options, error: optionsError } = await supabase
+      .from('poll_options')
+      .select('id')
+      .eq('poll_id', voteData.poll_id)
+      .in('id', voteData.option_ids);
+
+    if (optionsError || options.length !== voteData.option_ids.length) {
+      throw new Error('Invalid options selected');
+    }
+
+    // Check if user has already voted (if authenticated)
+    if (user) {
+      const { data: existingVotes, error: voteCheckError } = await supabase
+        .from('votes')
+        .select('id')
+        .eq('poll_id', voteData.poll_id)
+        .eq('voter_id', user.id);
+
+      if (voteCheckError) {
+        console.error('Error checking existing votes:', voteCheckError);
+      } else if (existingVotes && existingVotes.length > 0) {
+        if (!poll.allow_multiple_votes) {
+          throw new Error('You have already voted on this poll');
+        }
+      }
+    }
+
+    // Insert votes
+    const votesToInsert = voteData.option_ids.map(optionId => ({
+      poll_id: voteData.poll_id,
+      option_id: optionId,
+      voter_id: user?.id || null,
+      voter_email: voteData.voter_email || null,
+      voter_name: voteData.voter_name || null,
+    }));
+
+    const { error: insertError } = await supabase
+      .from('votes')
+      .insert(votesToInsert);
+
+    if (insertError) {
+      throw new Error(`Failed to submit vote: ${insertError.message}`);
+    }
+
+    revalidatePath(`/polls/${voteData.poll_id}`);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error submitting vote:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to submit vote' 
+    };
+  }
+}
