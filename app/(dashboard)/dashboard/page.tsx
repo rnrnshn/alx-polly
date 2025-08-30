@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/lib/hooks/useAuth';
 import { PollWithOptions } from '@/lib/types/database';
-import { PollCard } from '@/components/polls/PollCard';
+import { DashboardPollCard } from '@/components/polls/DashboardPollCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -13,6 +13,10 @@ function DashboardPage() {
   const { user } = useAuth();
   const [polls, setPolls] = useState<PollWithOptions[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const handlePollDeleted = (pollId: string) => {
+    setPolls(prevPolls => prevPolls.filter(poll => poll.id !== pollId));
+  };
 
   useEffect(() => {
     const fetchUserPolls = async () => {
@@ -125,7 +129,11 @@ function DashboardPage() {
           ) : polls.length > 0 ? (
             <div className="grid gap-6">
               {polls.map((poll) => (
-                <PollCard key={poll.id} poll={poll} />
+                <DashboardPollCard 
+                  key={poll.id} 
+                  poll={poll} 
+                  onPollDeleted={handlePollDeleted}
+                />
               ))}
             </div>
           ) : (
