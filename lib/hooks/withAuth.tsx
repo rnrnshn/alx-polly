@@ -8,16 +8,16 @@ const withAuth = <P extends object>(
   WrappedComponent: React.ComponentType<P>
 ) => {
   const WithAuthComponent = (props: P) => {
-    const { user, isLoading } = useAuth();
+    const { user, loading } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
-      if (!isLoading && !user) {
+      if (!loading && !user) {
         router.replace('/login');
       }
-    }, [isLoading, user, router]);
+    }, [loading, user, router]);
 
-    if (isLoading) {
+    if (loading) {
       return <div>Loading...</div>; // Or a spinner component
     }
 

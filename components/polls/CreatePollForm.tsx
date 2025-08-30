@@ -8,15 +8,17 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CreatePollData } from '@/lib/types';
+
+import { CreatePollData } from '@/lib/types/database';
+import { createPoll } from '@/lib/actions/polls';
 
 export function CreatePollForm() {
   const [formData, setFormData] = useState<CreatePollData>({
     title: '',
     description: '',
     options: ['', ''],
-    isPublic: true,
-    allowMultipleVotes: false,
+    is_public: true,
+    allow_multiple_votes: false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -73,11 +75,13 @@ export function CreatePollForm() {
     }
 
     try {
-      // TODO: Implement actual API call to create poll
-      console.log('Creating poll:', formData);
+      const result = await createPoll(formData);
       
-      // Mock success - redirect to dashboard
-      router.push('/dashboard');
+      if (result.success) {
+        router.push('/dashboard');
+      } else {
+        setError(result.error || 'Failed to create poll. Please try again.');
+      }
     } catch (err) {
       setError('Failed to create poll. Please try again.');
     } finally {
@@ -160,8 +164,8 @@ export function CreatePollForm() {
               <input
                 type="checkbox"
                 id="isPublic"
-                checked={formData.isPublic}
-                onChange={(e) => setFormData(prev => ({ ...prev, isPublic: e.target.checked }))}
+                checked={formData.is_public}
+                onChange={(e) => setFormData(prev => ({ ...prev, is_public: e.target.checked }))}
                 className="rounded"
               />
               <Label htmlFor="isPublic">Make this poll public</Label>
@@ -171,8 +175,8 @@ export function CreatePollForm() {
               <input
                 type="checkbox"
                 id="allowMultipleVotes"
-                checked={formData.allowMultipleVotes}
-                onChange={(e) => setFormData(prev => ({ ...prev, allowMultipleVotes: e.target.checked }))}
+                checked={formData.allow_multiple_votes}
+                onChange={(e) => setFormData(prev => ({ ...prev, allow_multiple_votes: e.target.checked }))}
                 className="rounded"
               />
               <Label htmlFor="allowMultipleVotes">Allow multiple votes per user</Label>

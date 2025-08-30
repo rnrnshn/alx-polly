@@ -1,18 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { Poll } from '@/lib/types';
+import { PollWithOptions } from '@/lib/types/database';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 interface PollCardProps {
-  poll: Poll;
+  poll: PollWithOptions;
 }
 
 export function PollCard({ poll }: PollCardProps) {
-  const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
-  const isExpired = poll.expiresAt && new Date() > poll.expiresAt;
+  // For now, we'll show 0 votes since we need to fetch vote counts separately
+  const totalVotes = 0;
+  const isExpired = poll.expires_at && new Date(poll.expires_at) > new Date();
+  
+  // Ensure poll_options is always an array
+  const options = poll.poll_options || [];
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -32,12 +36,12 @@ export function PollCard({ poll }: PollCardProps) {
           </div>
           <div className="flex flex-col items-end space-y-2">
             <div className="flex space-x-1">
-              {!poll.isPublic && (
+              {!poll.is_public && (
                 <Badge variant="secondary" className="text-xs">
                   Private
                 </Badge>
               )}
-              {poll.allowMultipleVotes && (
+              {poll.allow_multiple_votes && (
                 <Badge variant="outline" className="text-xs">
                   Multiple votes
                 </Badge>
@@ -54,17 +58,17 @@ export function PollCard({ poll }: PollCardProps) {
       <CardContent>
         <div className="space-y-3">
           <div className="text-sm text-muted-foreground">
-            {poll.options.length} options • {totalVotes} votes
+            {options.length} options • {totalVotes} votes
           </div>
           
           <div className="space-y-2">
-            {poll.options.slice(0, 3).map((option) => {
-              const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
+            {options.slice(0, 3).map((option) => {
+              const percentage = 0; // We'll implement vote counting later
               return (
                 <div key={option.id} className="space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="truncate">{option.text}</span>
-                    <span className="text-muted-foreground">{option.votes} votes</span>
+                    <span className="text-muted-foreground">0 votes</span>
                   </div>
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div
@@ -75,16 +79,16 @@ export function PollCard({ poll }: PollCardProps) {
                 </div>
               );
             })}
-            {poll.options.length > 3 && (
+            {options.length > 3 && (
               <div className="text-sm text-muted-foreground">
-                +{poll.options.length - 3} more options
+                +{options.length - 3} more options
               </div>
             )}
           </div>
 
           <div className="flex justify-between items-center pt-2">
             <div className="text-xs text-muted-foreground">
-              Created {new Date(poll.createdAt).toLocaleDateString()}
+              Created {new Date(poll.created_at).toLocaleDateString()}
             </div>
             <Button size="sm" asChild>
               <Link href={`/polls/${poll.id}`}>

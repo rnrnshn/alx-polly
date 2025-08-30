@@ -1,59 +1,62 @@
 'use client';
 
 import { useAuth } from '@/lib/hooks/useAuth';
-import { Poll } from '@/lib/types';
+import { PollWithOptions } from '@/lib/types/database';
 import { PollCard } from '@/components/polls/PollCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import withAuth from '@/lib/hooks/withAuth';
-
-// Mock data for demonstration
-const mockPolls: Poll[] = [
-  {
-    id: '1',
-    title: 'What\'s your favorite programming language?',
-    description: 'Let\'s see what the community prefers',
-    options: [
-      { id: '1', text: 'JavaScript', votes: 45, pollId: '1', createdAt: new Date(), updatedAt: new Date() },
-      { id: '2', text: 'Python', votes: 38, pollId: '1', createdAt: new Date(), updatedAt: new Date() },
-      { id: '3', text: 'TypeScript', votes: 32, pollId: '1', createdAt: new Date(), updatedAt: new Date() },
-      { id: '4', text: 'Rust', votes: 15, pollId: '1', createdAt: new Date(), updatedAt: new Date() },
-    ],
-    isActive: true,
-    isPublic: true,
-    allowMultipleVotes: false,
-    createdBy: '1',
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-01-15'),
-  },
-  {
-    id: '2',
-    title: 'Best pizza topping?',
-    description: 'The age-old debate continues',
-    options: [
-      { id: '5', text: 'Pepperoni', votes: 67, pollId: '2', createdAt: new Date(), updatedAt: new Date() },
-      { id: '6', text: 'Mushrooms', votes: 23, pollId: '2', createdAt: new Date(), updatedAt: new Date() },
-      { id: '7', text: 'Pineapple', votes: 12, pollId: '2', createdAt: new Date(), updatedAt: new Date() },
-    ],
-    isActive: true,
-    isPublic: true,
-    allowMultipleVotes: true,
-    createdBy: '1',
-    createdAt: new Date('2024-01-10'),
-    updatedAt: new Date('2024-01-10'),
-  },
-];
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 function DashboardPage() {
   const { user } = useAuth();
+  const [polls, setPolls] = useState<PollWithOptions[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserPolls = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('polls')
+          .select(`
+            *,
+            poll_options (
+              id,
+              text,
+              order_index
+            )
+          `)
+          .eq('created_by', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching polls:', error);
+        } else {
+          setPolls(data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching polls:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserPolls();
+  }, [user]);
 
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="space-y-8">
         {/* Welcome Section */}
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold">Welcome back, {user?.user_metadata.full_name}!</h1>
+          <h1 className="text-3xl font-bold">Welcome back, {(user as any)?.user_metadata?.full_name || user?.email || 'User'}!</h1>
           <p className="text-muted-foreground">
             Here's an overview of your polls and recent activity
           </p>
@@ -66,21 +69,21 @@ function DashboardPage() {
               <CardTitle className="text-sm font-medium">Total Polls</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockPolls.length}</div>
+              <div className="text-2xl font-bold">{polls.length}</div>
               <p className="text-xs text-muted-foreground">
-                +2 from last month
+                Your created polls
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Votes</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Options</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {mockPolls.reduce((sum, poll) => 
-                  sum + poll.options.reduce((optSum, opt) => optSum + opt.votes, 0), 0
+                {polls.reduce((sum, poll) => 
+                  sum + (poll.poll_options?.length || 0), 0
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -95,7 +98,7 @@ function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {mockPolls.filter(poll => poll.isActive).length}
+                {polls.filter(poll => poll.status === 'active').length}
               </div>
               <p className="text-xs text-muted-foreground">
                 Currently running
@@ -113,9 +116,15 @@ function DashboardPage() {
             </Button>
           </div>
 
-          {mockPolls.length > 0 ? (
+          {isLoading ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <p className="text-muted-foreground">Loading your polls...</p>
+              </CardContent>
+            </Card>
+          ) : polls.length > 0 ? (
             <div className="grid gap-6">
-              {mockPolls.map((poll) => (
+              {polls.map((poll) => (
                 <PollCard key={poll.id} poll={poll} />
               ))}
             </div>
@@ -137,4 +146,4 @@ function DashboardPage() {
   );
 }
 
-export default withAuth(DashboardPage);
+export default DashboardPage;
