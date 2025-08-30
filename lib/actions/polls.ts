@@ -64,7 +64,7 @@ export async function createPoll(formData: CreatePollData) {
     revalidatePath('/dashboard');
     revalidatePath('/polls');
     
-    return { success: true, pollId: poll.id };
+    return { success: true, pollId: poll.id, redirect: '/polls' };
   } catch (error) {
     console.error('Error creating poll:', error);
     return { 

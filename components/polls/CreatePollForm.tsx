@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 
 import { CreatePollData } from '@/lib/types/database';
 import { createPoll } from '@/lib/actions/polls';
@@ -22,6 +23,7 @@ export function CreatePollForm() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const router = useRouter();
 
@@ -78,7 +80,13 @@ export function CreatePollForm() {
       const result = await createPoll(formData);
       
       if (result.success) {
-        router.push('/dashboard');
+        setIsSuccess(true);
+        toast.success('Poll created successfully! Redirecting to polls...');
+        
+        // Redirect after a brief delay to show the success message
+        setTimeout(() => {
+          router.push('/polls');
+        }, 1500);
       } else {
         setError(result.error || 'Failed to create poll. Please try again.');
       }
@@ -189,6 +197,12 @@ export function CreatePollForm() {
             </div>
           )}
 
+          {isSuccess && (
+            <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md">
+              ✅ Poll created successfully! Redirecting to polls...
+            </div>
+          )}
+
           <div className="flex justify-end space-x-2">
             <Button
               type="button"
@@ -197,8 +211,8 @@ export function CreatePollForm() {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Creating...' : 'Create Poll'}
+            <Button type="submit" disabled={isLoading || isSuccess}>
+              {isLoading ? 'Creating...' : isSuccess ? 'Created!' : 'Create Poll'}
             </Button>
           </div>
         </form>
