@@ -12,9 +12,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 export function Header() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success('Signed out successfully!');
+    router.push('/login');
+  };
 
   return (
     <header className="border-b">
@@ -27,7 +37,7 @@ export function Header() {
           <Link href="/polls" className="hover:text-primary">
             Browse Polls
           </Link>
-          {isAuthenticated && (
+          {user && (
             <Link href="/polls/create" className="hover:text-primary">
               Create Poll
             </Link>
@@ -35,20 +45,20 @@ export function Header() {
         </nav>
 
         <div className="flex items-center space-x-4">
-          {isAuthenticated ? (
+          {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.avatar} alt={user?.name} />
-                    <AvatarFallback>{user?.name?.charAt(0).toUpperCase()}</AvatarFallback>
+                    <AvatarImage src={user?.user_metadata.avatar_url} alt={user?.user_metadata.full_name} />
+                    <AvatarFallback>{user?.user_metadata.full_name?.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.name}</p>
+                    <p className="text-sm font-medium leading-none">{user?.user_metadata.full_name}</p>
                     <p className="text-xs leading-none text-muted-foreground">
                       {user?.email}
                     </p>
@@ -62,7 +72,7 @@ export function Header() {
                   <Link href="/profile">Profile</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => logout()}>
+                <DropdownMenuItem onClick={handleLogout}>
                   Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>

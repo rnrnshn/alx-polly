@@ -6,6 +6,7 @@ import { PollCard } from '@/components/polls/PollCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
+import withAuth from '@/lib/hooks/withAuth';
 
 // Mock data for demonstration
 const mockPolls: Poll[] = [
@@ -44,44 +45,15 @@ const mockPolls: Poll[] = [
   },
 ];
 
-export default function DashboardPage() {
-  const { user, isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p>Loading...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-          <h1 className="text-2xl font-bold mb-4">Please sign in</h1>
-          <p className="text-muted-foreground mb-6">
-            You need to be signed in to view your dashboard
-          </p>
-          <Button asChild>
-            <Link href="/login">Sign in</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
+function DashboardPage() {
+  const { user } = useAuth();
 
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="space-y-8">
         {/* Welcome Section */}
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold">Welcome back, {user?.name}!</h1>
+          <h1 className="text-3xl font-bold">Welcome back, {user?.user_metadata.full_name}!</h1>
           <p className="text-muted-foreground">
             Here's an overview of your polls and recent activity
           </p>
@@ -164,3 +136,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+export default withAuth(DashboardPage);

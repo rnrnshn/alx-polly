@@ -1,6 +1,9 @@
-import { CreatePollForm } from '@/components/polls/CreatePollForm';
+'use client';
 
-export default function CreatePollPage() {
+import { CreatePollForm } from '@/components/polls/CreatePollForm';
+import withAuth from '@/lib/hooks/withAuth';
+
+function CreatePollPage() {
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-4xl mx-auto">
@@ -16,3 +19,5 @@ export default function CreatePollPage() {
     </div>
   );
 }
+
+export default withAuth(CreatePollPage);
