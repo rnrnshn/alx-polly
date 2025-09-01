@@ -295,9 +295,31 @@ export type CreatePollData = {
   options: string[]
 }
 
+export type EditPollFormData = {
+  title: string
+  description: string
+  is_public: boolean
+  allow_multiple_votes: boolean
+  expires_at?: string
+  options: string[]
+}
+
 export type VoteData = {
   poll_id: string
   option_id: string
   voter_email?: string
   voter_name?: string
+}
+
+export interface EditPollData {
+  id: string;
+  title: string;
+  description: string | null;
+  options: string[];
+  is_public: boolean;
+  allow_multiple_votes: boolean;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
 }

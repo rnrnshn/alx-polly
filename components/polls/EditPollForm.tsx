@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { CreatePollData, PollWithOptions } from '@/lib/types/database';
+import { EditPollFormData, PollWithOptions, EditPollData } from '@/lib/types/database';
 import { updatePoll, getPollById } from '@/lib/actions/polls';
 
 interface EditPollFormProps {
@@ -17,7 +17,7 @@ interface EditPollFormProps {
 }
 
 export function EditPollForm({ pollId }: EditPollFormProps) {
-  const [formData, setFormData] = useState<CreatePollData>({
+  const [formData, setFormData] = useState<EditPollFormData>({
     title: '',
     description: '',
     options: ['', ''],
@@ -37,6 +37,19 @@ export function EditPollForm({ pollId }: EditPollFormProps) {
         
         if (result.success && result.poll) {
           const poll = result.poll as PollWithOptions;
+          // Transform PollWithOptions to EditPollData format
+          const editPollData: EditPollData = {
+            id: poll.id,
+            title: poll.title,
+            description: poll.description,
+            options: poll.poll_options.map(option => option.text),
+            is_public: poll.is_public,
+            allow_multiple_votes: poll.allow_multiple_votes,
+            expires_at: poll.expires_at,
+            created_at: poll.created_at,
+            updated_at: poll.updated_at,
+            created_by: poll.created_by,
+          };
           setFormData({
             title: poll.title,
             description: poll.description || '',
@@ -60,7 +73,7 @@ export function EditPollForm({ pollId }: EditPollFormProps) {
 
   const addOption = () => {
     if (formData.options.length < 10) {
-      setFormData(prev => ({
+      setFormData((prev: EditPollFormData) => ({
         ...prev,
         options: [...prev.options, ''],
       }));
@@ -69,17 +82,17 @@ export function EditPollForm({ pollId }: EditPollFormProps) {
 
   const removeOption = (index: number) => {
     if (formData.options.length > 2) {
-      setFormData(prev => ({
+      setFormData((prev: EditPollFormData) => ({
         ...prev,
-        options: prev.options.filter((_, i) => i !== index),
+        options: prev.options.filter((_: string, i: number) => i !== index),
       }));
     }
   };
 
   const updateOption = (index: number, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev: EditPollFormData) => ({
       ...prev,
-      options: prev.options.map((option, i) => i === index ? value : option),
+      options: prev.options.map((option: string, i: number) => i === index ? value : option),
     }));
   };
 
@@ -95,13 +108,13 @@ export function EditPollForm({ pollId }: EditPollFormProps) {
       return;
     }
 
-    if (formData.options.some(option => !option.trim())) {
+    if (formData.options.some((option: string) => !option.trim())) {
       setError('All options must be filled');
       setIsLoading(false);
       return;
     }
 
-    if (new Set(formData.options.map(opt => opt.trim())).size !== formData.options.length) {
+    if (new Set(formData.options.map((opt: string) => opt.trim())).size !== formData.options.length) {
       setError('Options must be unique');
       setIsLoading(false);
       return;

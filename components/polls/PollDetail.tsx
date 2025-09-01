@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { submitVote } from '@/lib/actions/polls';
 
@@ -24,6 +25,10 @@ export function PollDetail({ poll }: PollDetailProps) {
 
   const isExpired = poll.expires_at && new Date(poll.expires_at) < new Date();
   const options = poll.poll_options || [];
+
+  // Calculate vote statistics
+  const totalVotes = options.reduce((sum, option) => sum + (option.vote_count || 0), 0);
+  const maxVotes = Math.max(...options.map(option => option.vote_count || 0), 0);
 
   const handleOptionChange = (optionId: string, checked: boolean) => {
     if (poll.allow_multiple_votes) {
@@ -119,6 +124,45 @@ export function PollDetail({ poll }: PollDetailProps) {
             </div>
           </div>
         </CardHeader>
+      </Card>
+
+      {/* Voting Progress */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Current Results</CardTitle>
+          <CardDescription>
+            {totalVotes} total vote{totalVotes !== 1 ? 's' : ''}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {options.map((option) => {
+              const voteCount = option.vote_count || 0;
+              const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+              const isLeading = voteCount > 0 && voteCount === maxVotes;
+              
+              return (
+                <div key={option.id} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium">{option.text}</span>
+                      {isLeading && (
+                        <Badge variant="default" className="text-xs">Leading</Badge>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {voteCount} vote{voteCount !== 1 ? 's' : ''} ({percentage.toFixed(1)}%)
+                    </div>
+                  </div>
+                  <Progress 
+                    value={percentage} 
+                    className="h-2"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
       </Card>
 
       {/* Voting Form */}
