@@ -19,6 +19,7 @@ The project uses the following technologies. Do not introduce new libraries or f
 - State Management: Primarily Server Components for server state. Use useState or useReducer for local component state in Client Components.
 - API Communication: Use Next.js Server Actions for mutations (creating polls, voting). Fetch data in Server Components using the Supabase client.
 - Utility Libraries: A library like qrcode.react for generating QR codes.
+- Package Manager: Use Yarn for everything, use well suited choice only if extremely needed
 
 
 ## Architecture & Code Style
