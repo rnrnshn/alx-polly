@@ -286,6 +286,18 @@ export type PollWithOptions = Poll & {
   }
 }
 
+export type PollWithVoteCounts = Poll & {
+  poll_options: {
+    id: string
+    text: string
+    order_index: number
+    vote_count: number
+  }[]
+  profiles?: {
+    name: string
+  }
+}
+
 export type CreatePollData = {
   title: string
   description?: string
