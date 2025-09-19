@@ -13,6 +13,35 @@ import { toast } from 'sonner';
 import { CreatePollData } from '@/lib/types/database';
 import { createPoll } from '@/lib/actions/polls';
 
+/**
+ * Interactive form component for creating new polls.
+ * 
+ * This component provides a comprehensive interface for poll creation with:
+ * - Dynamic option management (add/remove options)
+ * - Form validation (required fields, unique options)
+ * - Poll settings (public/private, multiple votes)
+ * - Real-time feedback and error handling
+ * - Automatic redirect on successful creation
+ * 
+ * The form uses controlled components with local state management and
+ * integrates with the createPoll server action for data persistence.
+ * It includes client-side validation to provide immediate feedback
+ * before server submission.
+ * 
+ * Features:
+ * - Minimum 2 options, maximum 10 options
+ * - Option uniqueness validation
+ * - Loading states and success feedback
+ * - Responsive design with shadcn/ui components
+ * 
+ * @returns JSX element containing the poll creation form
+ * 
+ * @example
+ * ```tsx
+ * // Used in poll creation page
+ * <CreatePollForm />
+ * ```
+ */
 export function CreatePollForm() {
   const [formData, setFormData] = useState<CreatePollData>({
     title: '',
@@ -27,6 +56,10 @@ export function CreatePollForm() {
 
   const router = useRouter();
 
+  /**
+   * Adds a new empty option to the poll.
+   * Enforces maximum limit of 10 options to prevent UI clutter.
+   */
   const addOption = () => {
     if (formData.options.length < 10) {
       setFormData(prev => ({
@@ -36,6 +69,10 @@ export function CreatePollForm() {
     }
   };
 
+  /**
+   * Removes an option at the specified index.
+   * Enforces minimum of 2 options to ensure valid poll structure.
+   */
   const removeOption = (index: number) => {
     if (formData.options.length > 2) {
       setFormData(prev => ({
@@ -45,6 +82,10 @@ export function CreatePollForm() {
     }
   };
 
+  /**
+   * Updates the text content of a specific option.
+   * Uses immutable update pattern to maintain React state consistency.
+   */
   const updateOption = (index: number, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -52,24 +93,36 @@ export function CreatePollForm() {
     }));
   };
 
+  /**
+   * Handles form submission with comprehensive validation and error handling.
+   * 
+   * Performs client-side validation before server submission:
+   * - Title is required and not empty
+   * - All options must be filled
+   * - Options must be unique (case-sensitive)
+   * 
+   * On successful creation, shows success feedback and redirects to polls page.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    // Validate form
+    // Client-side validation for better UX
     if (!formData.title.trim()) {
       setError('Poll title is required');
       setIsLoading(false);
       return;
     }
 
+    // Ensure all options are filled
     if (formData.options.some(option => !option.trim())) {
       setError('All options must be filled');
       setIsLoading(false);
       return;
     }
 
+    // Check for duplicate options using Set for uniqueness
     if (new Set(formData.options.map(opt => opt.trim())).size !== formData.options.length) {
       setError('Options must be unique');
       setIsLoading(false);
@@ -83,7 +136,7 @@ export function CreatePollForm() {
         setIsSuccess(true);
         toast.success('Poll created successfully! Redirecting to polls...');
         
-        // Redirect after a brief delay to show the success message
+        // Brief delay to show success message before redirect
         setTimeout(() => {
           router.push('/polls');
         }, 1500);

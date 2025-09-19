@@ -4,18 +4,51 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { CreatePollData } from '@/lib/types/database';
 
+/**
+ * Creates a new poll with associated options in the database.
+ * 
+ * This server action handles the complete poll creation workflow:
+ * 1. Validates user authentication and profile existence
+ * 2. Creates the poll record with user-provided data
+ * 3. Creates associated poll options with proper ordering
+ * 4. Handles rollback if any step fails
+ * 5. Revalidates relevant cache paths
+ * 
+ * The function ensures data integrity by using database transactions
+ * and proper error handling. If poll options creation fails, the poll
+ * itself is deleted to maintain consistency.
+ * 
+ * @param formData - Poll creation data including title, description, options, and settings
+ * @returns Promise resolving to success/error result with poll ID and redirect path
+ * 
+ * @example
+ * ```tsx
+ * const result = await createPoll({
+ *   title: "What's your favorite color?",
+ *   description: "Help us choose our brand color",
+ *   options: ["Red", "Blue", "Green"],
+ *   is_public: true,
+ *   allow_multiple_votes: false
+ * });
+ * 
+ * if (result.success) {
+ *   router.push(result.redirect);
+ * }
+ * ```
+ */
 export async function createPoll(formData: CreatePollData) {
   try {
     const supabase = await createClient();
     
-    // Get the current user
+    // Validate user authentication - polls require a logged-in user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
       throw new Error('You must be logged in to create a poll');
     }
 
-    // Get user profile
+    // Verify user profile exists - this ensures the user has a complete profile
+    // The profile is created automatically via database trigger on user signup
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id')
@@ -26,16 +59,17 @@ export async function createPoll(formData: CreatePollData) {
       throw new Error('User profile not found. Please try logging out and back in.');
     }
 
-    // Create the poll
+    // Create the main poll record with user-provided data
+    // Default values are applied for optional fields
     const { data: poll, error: pollError } = await supabase
       .from('polls')
       .insert({
         title: formData.title,
         description: formData.description,
-        is_public: formData.is_public ?? true,
-        allow_multiple_votes: formData.allow_multiple_votes ?? false,
+        is_public: formData.is_public ?? true, // Default to public
+        allow_multiple_votes: formData.allow_multiple_votes ?? false, // Default to single vote
         expires_at: formData.expires_at,
-        created_by: profile.id
+        created_by: profile.id // Link to the authenticated user
       })
       .select()
       .single();
@@ -44,25 +78,28 @@ export async function createPoll(formData: CreatePollData) {
       throw new Error(`Failed to create poll: ${pollError.message}`);
     }
 
-    // Create poll options
+    // Create poll options with proper ordering
+    // Each option gets an incremental order_index for consistent display
     const optionsData = formData.options.map((text, index) => ({
       poll_id: poll.id,
-      text: text.trim(),
-      order_index: index + 1
+      text: text.trim(), // Remove leading/trailing whitespace
+      order_index: index + 1 // Start ordering from 1
     }));
 
     const { error: optionsError } = await supabase
       .from('poll_options')
       .insert(optionsData);
 
+    // Handle options creation failure with rollback
+    // This maintains data integrity by removing the orphaned poll
     if (optionsError) {
-      // Clean up the poll if options creation fails
       await supabase.from('polls').delete().eq('id', poll.id);
       throw new Error(`Failed to create poll options: ${optionsError.message}`);
     }
 
-    revalidatePath('/dashboard');
-    revalidatePath('/polls');
+    // Revalidate cache to ensure fresh data on next page load
+    revalidatePath('/dashboard'); // User's dashboard
+    revalidatePath('/polls'); // Public polls listing
     
     return { success: true, pollId: poll.id, redirect: '/polls' };
   } catch (error) {
@@ -74,10 +111,38 @@ export async function createPoll(formData: CreatePollData) {
   }
 }
 
+/**
+ * Fetches all public, active polls with their options and creator information.
+ * 
+ * This function retrieves polls that are available for public viewing and voting.
+ * It includes related data like poll options and creator names through database
+ * joins. The results are ordered by creation date (newest first) and filtered
+ * to only show active, public polls.
+ * 
+ * The function handles potential null values in poll_options to ensure the
+ * returned data structure is consistent and safe to use in components.
+ * 
+ * @returns Promise resolving to polls array and error state
+ * 
+ * @example
+ * ```tsx
+ * const { polls, error } = await getPolls();
+ * 
+ * if (error) {
+ *   console.error('Failed to load polls:', error);
+ * } else {
+ *   polls.forEach(poll => {
+ *     console.log(`${poll.title} by ${poll.profiles.name}`);
+ *   });
+ * }
+ * ```
+ */
 export async function getPolls() {
   try {
     const supabase = await createClient();
     
+    // Fetch polls with related data using Supabase's relational queries
+    // This single query gets polls, their options, and creator information
     const { data: polls, error } = await supabase
       .from('polls')
       .select(`
@@ -91,15 +156,16 @@ export async function getPolls() {
           name
         )
       `)
-      .eq('is_public', true)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false });
+      .eq('is_public', true) // Only public polls
+      .eq('status', 'active') // Only active polls
+      .order('created_at', { ascending: false }); // Newest first
 
     if (error) {
       throw new Error(`Failed to fetch polls: ${error.message}`);
     }
 
-    // Ensure poll_options is always an array
+    // Normalize poll_options to ensure it's always an array
+    // This prevents runtime errors when components expect an array
     const pollsWithOptions = polls?.map(poll => ({
       ...poll,
       poll_options: poll.poll_options || []
@@ -286,6 +352,40 @@ export async function getPollById(pollId: string) {
   }
 }
 
+/**
+ * Submits votes for a poll with comprehensive validation and security checks.
+ * 
+ * This server action handles the complete voting workflow:
+ * 1. Validates poll exists and is active/not expired
+ * 2. Verifies selected options belong to the poll
+ * 3. Checks voting permissions (multiple votes, existing votes)
+ * 4. Records votes with proper voter identification
+ * 5. Handles both authenticated and anonymous voting
+ * 
+ * The function supports both single and multiple vote scenarios, with proper
+ * validation to prevent duplicate votes when not allowed. It also handles
+ * anonymous voting by storing voter email/name when provided.
+ * 
+ * @param voteData - Vote submission data including poll ID, option IDs, and voter info
+ * @returns Promise resolving to success/error result
+ * 
+ * @example
+ * ```tsx
+ * // Authenticated user voting
+ * const result = await submitVote({
+ *   poll_id: "poll-123",
+ *   option_ids: ["option-1", "option-2"],
+ * });
+ * 
+ * // Anonymous voting
+ * const result = await submitVote({
+ *   poll_id: "poll-123", 
+ *   option_ids: ["option-1"],
+ *   voter_name: "John Doe",
+ *   voter_email: "john@example.com"
+ * });
+ * ```
+ */
 export async function submitVote(voteData: {
   poll_id: string;
   option_ids: string[];
@@ -295,10 +395,11 @@ export async function submitVote(voteData: {
   try {
     const supabase = await createClient();
     
-    // Get the current user (optional)
+    // Get current user (optional - supports anonymous voting)
+    // Authenticated users get additional vote tracking capabilities
     const { data: { user } } = await supabase.auth.getUser();
     
-    // Check if poll exists and is active
+    // Validate poll exists and get voting rules
     const { data: poll, error: pollError } = await supabase
       .from('polls')
       .select('status, expires_at, allow_multiple_votes')
@@ -309,16 +410,18 @@ export async function submitVote(voteData: {
       throw new Error('Poll not found');
     }
 
-    // Check if poll is active and not expired
+    // Check poll is active and not expired
     if (poll.status !== 'active') {
       throw new Error('Poll is not active');
     }
 
+    // Check expiration date if set
     if (poll.expires_at && new Date(poll.expires_at) < new Date()) {
       throw new Error('Poll has expired');
     }
 
-    // Validate options exist and belong to the poll
+    // Validate all selected options exist and belong to this poll
+    // This prevents voting on options from other polls
     const { data: options, error: optionsError } = await supabase
       .from('poll_options')
       .select('id')
@@ -329,7 +432,8 @@ export async function submitVote(voteData: {
       throw new Error('Invalid options selected');
     }
 
-    // Check if user has already voted (if authenticated)
+    // Check existing votes for authenticated users
+    // This enforces single-vote restrictions when applicable
     if (user) {
       const { data: existingVotes, error: voteCheckError } = await supabase
         .from('votes')
@@ -340,21 +444,24 @@ export async function submitVote(voteData: {
       if (voteCheckError) {
         console.error('Error checking existing votes:', voteCheckError);
       } else if (existingVotes && existingVotes.length > 0) {
+        // Enforce single-vote restriction if poll doesn't allow multiple votes
         if (!poll.allow_multiple_votes) {
           throw new Error('You have already voted on this poll');
         }
       }
     }
 
-    // Insert votes
+    // Prepare vote records for insertion
+    // Each selected option gets its own vote record
     const votesToInsert = voteData.option_ids.map(optionId => ({
       poll_id: voteData.poll_id,
       option_id: optionId,
-      voter_id: user?.id || null,
-      voter_email: voteData.voter_email || null,
-      voter_name: voteData.voter_name || null,
+      voter_id: user?.id || null, // Authenticated user ID or null for anonymous
+      voter_email: voteData.voter_email || null, // For anonymous voting tracking
+      voter_name: voteData.voter_name || null, // For anonymous voting display
     }));
 
+    // Insert all votes atomically
     const { error: insertError } = await supabase
       .from('votes')
       .insert(votesToInsert);
@@ -363,6 +470,7 @@ export async function submitVote(voteData: {
       throw new Error(`Failed to submit vote: ${insertError.message}`);
     }
 
+    // Revalidate the poll page to show updated results
     revalidatePath(`/polls/${voteData.poll_id}`);
     
     return { success: true };

@@ -23,6 +23,36 @@ interface DashboardPollCardProps {
   onPollDeleted: (pollId: string) => void;
 }
 
+/**
+ * Dashboard poll card component for displaying and managing individual polls.
+ * 
+ * This component provides a comprehensive interface for poll management within
+ * the user dashboard. It displays poll information, status badges, and provides
+ * actions for viewing, editing, sharing, and deleting polls.
+ * 
+ * Features:
+ * - Poll information display (title, description, options preview)
+ * - Status badges (public/private, multiple votes, expired, active)
+ * - Action dropdown menu with poll management options
+ * - Direct poll deletion with confirmation
+ * - Share functionality with clipboard integration
+ * - Navigation to poll view and edit pages
+ * 
+ * The component handles poll deletion through direct database calls and
+ * notifies the parent component via callback for state synchronization.
+ * 
+ * @param poll - The poll data to display and manage
+ * @param onPollDeleted - Callback function called when poll is deleted
+ * @returns JSX element containing the poll card with management interface
+ * 
+ * @example
+ * ```tsx
+ * <DashboardPollCard 
+ *   poll={userPoll} 
+ *   onPollDeleted={(pollId) => removePollFromList(pollId)} 
+ * />
+ * ```
+ */
 export function DashboardPollCard({ poll, onPollDeleted }: DashboardPollCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
@@ -30,6 +60,12 @@ export function DashboardPollCard({ poll, onPollDeleted }: DashboardPollCardProp
   const isExpired = poll.expires_at && new Date(poll.expires_at) < new Date();
   const options = poll.poll_options || [];
 
+  /**
+   * Handles poll deletion with confirmation and proper cleanup.
+   * 
+   * Deletes poll options first due to foreign key constraints, then deletes
+   * the poll itself. Provides user feedback and updates parent component state.
+   */
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this poll? This action cannot be undone.')) {
       return;
@@ -40,6 +76,7 @@ export function DashboardPollCard({ poll, onPollDeleted }: DashboardPollCardProp
       const supabase = createClient();
       
       // Delete poll options first (due to foreign key constraint)
+      // This prevents database constraint violations
       const { error: optionsError } = await supabase
         .from('poll_options')
         .delete()
@@ -49,7 +86,7 @@ export function DashboardPollCard({ poll, onPollDeleted }: DashboardPollCardProp
         throw new Error('Failed to delete poll options');
       }
 
-      // Delete the poll
+      // Delete the main poll record
       const { error: pollError } = await supabase
         .from('polls')
         .delete()
@@ -69,14 +106,24 @@ export function DashboardPollCard({ poll, onPollDeleted }: DashboardPollCardProp
     }
   };
 
+  /**
+   * Navigates to the poll edit page.
+   */
   const handleEdit = () => {
     router.push(`/polls/${poll.id}/edit`);
   };
 
+  /**
+   * Navigates to the poll view page.
+   */
   const handleView = () => {
     router.push(`/polls/${poll.id}`);
   };
 
+  /**
+   * Copies the poll URL to clipboard for sharing.
+   * Uses the Clipboard API for modern browsers.
+   */
   const handleShare = () => {
     const pollUrl = `${window.location.origin}/polls/${poll.id}`;
     navigator.clipboard.writeText(pollUrl);

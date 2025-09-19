@@ -9,15 +9,44 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
+/**
+ * User dashboard page component displaying poll management interface.
+ * 
+ * This component provides a comprehensive overview of the user's poll activity:
+ * - Welcome message with user information
+ * - Statistics cards showing poll counts and metrics
+ * - List of user's created polls with management actions
+ * - Quick access to poll creation
+ * 
+ * The dashboard fetches user-specific polls on mount and provides real-time
+ * updates when polls are deleted. It includes loading states and empty states
+ * for better user experience.
+ * 
+ * Features:
+ * - Real-time poll statistics calculation
+ * - Poll management (view, edit, delete, share)
+ * - Responsive grid layout for statistics
+ * - Empty state with call-to-action for new users
+ * 
+ * @returns JSX element containing the user dashboard interface
+ */
 function DashboardPage() {
   const { user } = useAuth();
   const [polls, setPolls] = useState<PollWithOptions[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  /**
+   * Handles poll deletion by removing it from the local state.
+   * This provides immediate UI feedback without requiring a full page refresh.
+   */
   const handlePollDeleted = (pollId: string) => {
     setPolls(prevPolls => prevPolls.filter(poll => poll.id !== pollId));
   };
 
+  /**
+   * Effect to fetch user's polls when component mounts or user changes.
+   * Only fetches when user is authenticated to prevent unnecessary API calls.
+   */
   useEffect(() => {
     const fetchUserPolls = async () => {
       if (!user) {
@@ -27,6 +56,7 @@ function DashboardPage() {
 
       try {
         const supabase = createClient();
+        // Fetch user's polls with their options for complete data
         const { data, error } = await supabase
           .from('polls')
           .select(`
@@ -37,8 +67,8 @@ function DashboardPage() {
               order_index
             )
           `)
-          .eq('created_by', user.id)
-          .order('created_at', { ascending: false });
+          .eq('created_by', user.id) // Only user's own polls
+          .order('created_at', { ascending: false }); // Newest first
 
         if (error) {
           console.error('Error fetching polls:', error);
