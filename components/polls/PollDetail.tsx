@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { submitVote } from '@/lib/actions/polls';
 
 interface PollDetailProps {
   poll: PollWithOptions;
@@ -364,15 +363,22 @@ export function PollDetail({ poll }: PollDetailProps) {
     
     try {
       const voteData = {
-        poll_id: poll.id,
         option_ids: selectedOptions,
         voter_name: voterInfo.name || undefined,
         voter_email: voterInfo.email || undefined,
       };
 
-      const result = await submitVote(voteData);
+      const response = await fetch(`/api/polls/${poll.id}/vote`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(voteData),
+      });
+
+      const result = await response.json();
       
-      if (result.success) {
+      if (response.ok) {
         toast.success('Vote submitted successfully!');
         setHasVoted(true);
       } else {

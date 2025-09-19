@@ -15,7 +15,6 @@ import {
 import { MoreVertical, Edit, Trash2, Eye, Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
 interface DashboardPollCardProps {
@@ -73,27 +72,13 @@ export function DashboardPollCard({ poll, onPollDeleted }: DashboardPollCardProp
 
     setIsDeleting(true);
     try {
-      const supabase = createClient();
-      
-      // Delete poll options first (due to foreign key constraint)
-      // This prevents database constraint violations
-      const { error: optionsError } = await supabase
-        .from('poll_options')
-        .delete()
-        .eq('poll_id', poll.id);
+      const response = await fetch(`/api/polls/${poll.id}`, {
+        method: 'DELETE',
+      });
 
-      if (optionsError) {
-        throw new Error('Failed to delete poll options');
-      }
-
-      // Delete the main poll record
-      const { error: pollError } = await supabase
-        .from('polls')
-        .delete()
-        .eq('id', poll.id);
-
-      if (pollError) {
-        throw new Error('Failed to delete poll');
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to delete poll');
       }
 
       toast.success('Poll deleted successfully');

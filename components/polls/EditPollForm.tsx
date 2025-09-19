@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { EditPollFormData, PollWithOptions, EditPollData } from '@/lib/types/database';
-import { updatePoll, getPollById } from '@/lib/actions/polls';
 
 interface EditPollFormProps {
   pollId: string;
@@ -33,9 +32,10 @@ export function EditPollForm({ pollId }: EditPollFormProps) {
   useEffect(() => {
     const fetchPoll = async () => {
       try {
-        const result = await getPollById(pollId);
+        const response = await fetch(`/api/polls/${pollId}`);
+        const result = await response.json();
         
-        if (result.success && result.poll) {
+        if (response.ok && result.poll) {
           const poll = result.poll as PollWithOptions;
           // Transform PollWithOptions to EditPollData format
           const editPollData: EditPollData = {
@@ -121,9 +121,17 @@ export function EditPollForm({ pollId }: EditPollFormProps) {
     }
 
     try {
-      const result = await updatePoll(pollId, formData);
+      const response = await fetch(`/api/polls/${pollId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
       
-      if (result.success) {
+      if (response.ok) {
         toast.success('Poll updated successfully!');
         router.push('/dashboard');
       } else {

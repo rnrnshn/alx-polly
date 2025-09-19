@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
 import { CreatePollData } from '@/lib/types/database';
-import { createPoll } from '@/lib/actions/polls';
 
 /**
  * Interactive form component for creating new polls.
@@ -130,9 +129,17 @@ export function CreatePollForm() {
     }
 
     try {
-      const result = await createPoll(formData);
+      const response = await fetch('/api/polls', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
       
-      if (result.success) {
+      if (response.ok) {
         setIsSuccess(true);
         toast.success('Poll created successfully! Redirecting to polls...');
         

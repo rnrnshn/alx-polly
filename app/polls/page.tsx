@@ -2,10 +2,26 @@ import { PollCard } from '@/components/polls/PollCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
-import { getPolls } from '@/lib/actions/polls';
+import { PollWithOptions } from '@/lib/types/database';
+
+async function getPolls() {
+  const res = await fetch('/api/polls', { cache: 'no-store' });
+  if (!res.ok) {
+    throw new Error('Failed to fetch polls');
+  }
+  const data = await res.json();
+  return data.polls;
+}
 
 async function PollsPage() {
-  const { polls, error } = await getPolls();
+  let polls: PollWithOptions[] = [];
+  let error: string | null = null;
+
+  try {
+    polls = await getPolls();
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'An unknown error occurred';
+  }
   
   if (error) {
     return (
