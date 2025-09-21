@@ -13,13 +13,21 @@ import {
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import { MoreVertical, Edit, Trash2, Eye, Share2 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { getPollResults } from '@/lib/actions/polls';
 
 interface DashboardPollCardProps {
   poll: PollWithOptions;
   onPollDeleted: (pollId: string) => void;
+}
+
+interface PollResult {
+  option_id: string;
+  option_text: string;
+  vote_count: number;
+  percentage: number;
 }
 
 /**
@@ -54,10 +62,34 @@ interface DashboardPollCardProps {
  */
 export function DashboardPollCard({ poll, onPollDeleted }: DashboardPollCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [pollResults, setPollResults] = useState<PollResult[]>([]);
+  const [isLoadingResults, setIsLoadingResults] = useState(true);
   const router = useRouter();
   
   const isExpired = poll.expires_at && new Date(poll.expires_at) < new Date();
   const options = poll.poll_options || [];
+
+  // Fetch poll results on component mount
+  useEffect(() => {
+    const fetchResults = async () => {
+      setIsLoadingResults(true);
+      try {
+        const result = await getPollResults(poll.id);
+        if (result.success && result.data) {
+          setPollResults(result.data);
+        }
+      } catch (error) {
+        console.error('Error fetching poll results:', error);
+      } finally {
+        setIsLoadingResults(false);
+      }
+    };
+
+    fetchResults();
+  }, [poll.id]);
+
+  // Calculate total votes from results
+  const totalVotes = pollResults.reduce((sum, result) => sum + Number(result.vote_count), 0);
 
   /**
    * Handles poll deletion with confirmation and proper cleanup.
@@ -188,16 +220,23 @@ export function DashboardPollCard({ poll, onPollDeleted }: DashboardPollCardProp
       <CardContent>
         <div className="space-y-3">
           <div className="text-sm text-muted-foreground">
-            {options.length} options • Created {new Date(poll.created_at).toLocaleDateString()}
+            {options.length} options • {totalVotes} votes • Created {new Date(poll.created_at).toLocaleDateString()}
           </div>
           
           <div className="space-y-2">
-            {options.slice(0, 3).map((option) => (
-              <div key={option.id} className="flex justify-between text-sm">
-                <span className="truncate">{option.text}</span>
-                <span className="text-muted-foreground">0 votes</span>
-              </div>
-            ))}
+            {options.slice(0, 3).map((option) => {
+              const result = pollResults.find(r => r.option_id === option.id);
+              const voteCount = result ? Number(result.vote_count) : 0;
+              
+              return (
+                <div key={option.id} className="flex justify-between text-sm">
+                  <span className="truncate">{option.text}</span>
+                  <span className="text-muted-foreground">
+                    {isLoadingResults ? '...' : `${voteCount} vote${voteCount !== 1 ? 's' : ''}`}
+                  </span>
+                </div>
+              );
+            })}
             {options.length > 3 && (
               <div className="text-sm text-muted-foreground">
                 +{options.length - 3} more options

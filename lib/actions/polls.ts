@@ -482,3 +482,51 @@ export async function submitVote(voteData: {
     };
   }
 }
+
+/**
+ * Fetches poll results with vote counts and percentages using the database function.
+ * 
+ * This server action calls the get_poll_results() database function to retrieve
+ * real-time vote statistics for a poll, including vote counts and percentages
+ * for each option. The results are ordered by option order and creation time.
+ * 
+ * @param pollId - The UUID of the poll to get results for
+ * @returns Promise resolving to poll results or error
+ * 
+ * @example
+ * ```tsx
+ * const results = await getPollResults("poll-123");
+ * if (results.success) {
+ *   console.log(results.data); // Array of option results with vote counts
+ * }
+ * ```
+ */
+export async function getPollResults(pollId: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Use the database function to get results
+    const { data, error } = await supabase.rpc('get_poll_results', {
+      poll_uuid: pollId
+    });
+
+    if (error) {
+      console.error('Error fetching poll results:', error);
+      return {
+        success: false,
+        error: 'Failed to fetch poll results'
+      };
+    }
+
+    return {
+      success: true,
+      data: data || []
+    };
+  } catch (error) {
+    console.error('Error in getPollResults:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch poll results'
+    };
+  }
+}

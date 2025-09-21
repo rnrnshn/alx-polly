@@ -1,22 +1,54 @@
 'use client';
 
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { PollWithOptions } from '@/lib/types/database';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { getPollResults } from '@/lib/actions/polls';
 
 interface PollCardProps {
   poll: PollWithOptions;
 }
 
+interface PollResult {
+  option_id: string;
+  option_text: string;
+  vote_count: number;
+  percentage: number;
+}
+
 export function PollCard({ poll }: PollCardProps) {
-  // For now, we'll show 0 votes since we need to fetch vote counts separately
-  const totalVotes = 0;
-  const isExpired = poll.expires_at && new Date(poll.expires_at) > new Date();
+  const [pollResults, setPollResults] = useState<PollResult[]>([]);
+  const [isLoadingResults, setIsLoadingResults] = useState(true);
+  
+  const isExpired = Boolean(poll.expires_at && new Date(poll.expires_at) < new Date());
   
   // Ensure poll_options is always an array
   const options = poll.poll_options || [];
+
+  // Fetch poll results on component mount
+  useEffect(() => {
+    const fetchResults = async () => {
+      setIsLoadingResults(true);
+      try {
+        const result = await getPollResults(poll.id);
+        if (result.success && result.data) {
+          setPollResults(result.data);
+        }
+      } catch (error) {
+        console.error('Error fetching poll results:', error);
+      } finally {
+        setIsLoadingResults(false);
+      }
+    };
+
+    fetchResults();
+  }, [poll.id]);
+
+  // Calculate total votes from results
+  const totalVotes = pollResults.reduce((sum, result) => sum + Number(result.vote_count), 0);
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -63,12 +95,17 @@ export function PollCard({ poll }: PollCardProps) {
           
           <div className="space-y-2">
             {options.slice(0, 3).map((option) => {
-              const percentage = 0; // We'll implement vote counting later
+              const result = pollResults.find(r => r.option_id === option.id);
+              const voteCount = result ? Number(result.vote_count) : 0;
+              const percentage = result ? Number(result.percentage) : 0;
+              
               return (
                 <div key={option.id} className="space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="truncate">{option.text}</span>
-                    <span className="text-muted-foreground">0 votes</span>
+                    <span className="text-muted-foreground">
+                      {isLoadingResults ? '...' : `${voteCount} vote${voteCount !== 1 ? 's' : ''}`}
+                    </span>
                   </div>
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div
