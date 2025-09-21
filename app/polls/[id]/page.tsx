@@ -1,36 +1,24 @@
 import { notFound } from 'next/navigation';
 import { PollDetail } from '@/components/polls/PollDetail';
 import { PollWithOptions } from '@/lib/types/database';
+import { getPollById } from '@/lib/actions/polls';
 
 interface PollDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
-}
-
-async function getPoll(id: string): Promise<PollWithOptions | null> {
-  try {
-    const res = await fetch(`/api/polls/${id}`, { cache: 'no-store' });
-    if (!res.ok) {
-      return null;
-    }
-    const data = await res.json();
-    return data.poll;
-  } catch (error) {
-    return null;
-  }
+  }>;
 }
 
 export default async function PollDetailPage({ params }: PollDetailPageProps) {
-  const { id } = params;
+  const { id } = await params;
   
   if (!id) {
     notFound();
   }
 
-  const poll = await getPoll(id);
+  const { success, poll, error } = await getPollById(id);
   
-  if (!poll) {
+  if (!success || !poll) {
     notFound();
   }
 

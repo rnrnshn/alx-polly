@@ -3,25 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import { PollWithOptions } from '@/lib/types/database';
-
-async function getPolls() {
-  const res = await fetch('/api/polls', { cache: 'no-store' });
-  if (!res.ok) {
-    throw new Error('Failed to fetch polls');
-  }
-  const data = await res.json();
-  return data.polls;
-}
+import { getPolls } from '@/lib/actions/polls';
 
 async function PollsPage() {
-  let polls: PollWithOptions[] = [];
-  let error: string | null = null;
-
-  try {
-    polls = await getPolls();
-  } catch (e) {
-    error = e instanceof Error ? e.message : 'An unknown error occurred';
-  }
+  const { polls, error } = await getPolls();
   
   if (error) {
     return (

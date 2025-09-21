@@ -2,8 +2,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { type NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const voteData: { option_ids: string[]; voter_name?: string; voter_email?: string; } = await req.json();
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const { data: poll, error: pollError } = await supabase
       .from('polls')
       .select('status, expires_at, allow_multiple_votes')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (pollError || !poll) {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const { data: options, error: optionsError } = await supabase
       .from('poll_options')
       .select('id')
-      .eq('poll_id', params.id)
+      .eq('poll_id', id)
       .in('id', voteData.option_ids);
 
     if (optionsError || options.length !== voteData.option_ids.length) {
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const { data: existingVotes, error: voteCheckError } = await supabase
         .from('votes')
         .select('id')
-        .eq('poll_id', params.id)
+        .eq('poll_id', id)
         .eq('voter_id', user.id);
 
       if (voteCheckError) {
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     const votesToInsert = voteData.option_ids.map(optionId => ({
-      poll_id: params.id,
+      poll_id: id,
       option_id: optionId,
       voter_id: user?.id || null,
       voter_email: voteData.voter_email || null,

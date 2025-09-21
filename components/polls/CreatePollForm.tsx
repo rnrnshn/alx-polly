@@ -8,9 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
 import { CreatePollData } from '@/lib/types/database';
+import { createPoll } from '@/lib/actions/polls';
 
 /**
  * Interactive form component for creating new polls.
@@ -129,23 +131,15 @@ export function CreatePollForm() {
     }
 
     try {
-      const response = await fetch('/api/polls', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const result = await response.json();
+      const result = await createPoll(formData);
       
-      if (response.ok) {
+      if (result.success) {
         setIsSuccess(true);
         toast.success('Poll created successfully! Redirecting to polls...');
         
         // Brief delay to show success message before redirect
         setTimeout(() => {
-          router.push('/polls');
+          router.push(result.redirect || '/polls');
         }, 1500);
       } else {
         setError(result.error || 'Failed to create poll. Please try again.');
@@ -229,23 +223,21 @@ export function CreatePollForm() {
 
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="isPublic"
                 checked={formData.is_public}
-                onChange={(e) => setFormData(prev => ({ ...prev, is_public: e.target.checked }))}
-                className="rounded"
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_public: checked as boolean }))}
+                aria-label="Make this poll public"
               />
               <Label htmlFor="isPublic">Make this poll public</Label>
             </div>
 
             <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="allowMultipleVotes"
                 checked={formData.allow_multiple_votes}
-                onChange={(e) => setFormData(prev => ({ ...prev, allow_multiple_votes: e.target.checked }))}
-                className="rounded"
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, allow_multiple_votes: checked as boolean }))}
+                aria-label="Allow multiple votes per user"
               />
               <Label htmlFor="allowMultipleVotes">Allow multiple votes per user</Label>
             </div>

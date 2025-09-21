@@ -3,8 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { type NextRequest, NextResponse } from 'next/server';
 import { CreatePollData } from '@/lib/types/database';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
     const { data: poll, error } = await supabase
       .from('polls')
@@ -16,11 +17,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
           order_index
         )
       `)
-      .eq('id', params.id)
-      .single();
+      .eq('id', id)
+      .maybeSingle();
 
     if (error) {
       return NextResponse.json({ error: `Failed to fetch poll: ${error.message}` }, { status: 500 });
+    }
+
+    if (!poll) {
+      return NextResponse.json({ error: 'Poll not found' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, poll });
@@ -30,8 +35,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -42,10 +48,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const { data: existingPoll, error: pollCheckError } = await supabase
       .from('polls')
       .select('created_by')
-      .eq('id', params.id)
-      .single();
+      .eq('id', id)
+      .maybeSingle();
 
-    if (pollCheckError || !existingPoll) {
+    if (pollCheckError) {
+      return NextResponse.json({ error: `Failed to check poll: ${pollCheckError.message}` }, { status: 500 });
+    }
+
+    if (!existingPoll) {
       return NextResponse.json({ error: 'Poll not found' }, { status: 404 });
     }
 
@@ -64,7 +74,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         allow_multiple_votes: formData.allow_multiple_votes ?? false,
         expires_at: formData.expires_at,
       })
-      .eq('id', params.id);
+      .eq('id', id);
 
     if (pollError) {
       return NextResponse.json({ error: `Failed to update poll: ${pollError.message}` }, { status: 500 });
@@ -73,14 +83,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const { error: deleteOptionsError } = await supabase
       .from('poll_options')
       .delete()
-      .eq('poll_id', params.id);
+      .eq('poll_id', id);
 
     if (deleteOptionsError) {
       return NextResponse.json({ error: `Failed to delete existing options: ${deleteOptionsError.message}` }, { status: 500 });
     }
 
     const optionsData = formData.options.map((text, index) => ({
-      poll_id: params.id,
+      poll_id: id,
       text: text.trim(),
       order_index: index + 1
     }));
@@ -93,15 +103,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: `Failed to create poll options: ${optionsError.message}` }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, pollId: params.id });
+    return NextResponse.json({ success: true, pollId: id });
   } catch (error) {
     console.error('Error updating poll:', error);
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to update poll' }, { status: 500 });
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -112,10 +123,14 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     const { data: existingPoll, error: pollCheckError } = await supabase
       .from('polls')
       .select('created_by')
-      .eq('id', params.id)
-      .single();
+      .eq('id', id)
+      .maybeSingle();
 
-    if (pollCheckError || !existingPoll) {
+    if (pollCheckError) {
+      return NextResponse.json({ error: `Failed to check poll: ${pollCheckError.message}` }, { status: 500 });
+    }
+
+    if (!existingPoll) {
       return NextResponse.json({ error: 'Poll not found' }, { status: 404 });
     }
 
@@ -126,7 +141,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     const { error: optionsError } = await supabase
       .from('poll_options')
       .delete()
-      .eq('poll_id', params.id);
+      .eq('poll_id', id);
 
     if (optionsError) {
       return NextResponse.json({ error: `Failed to delete poll options: ${optionsError.message}` }, { status: 500 });
@@ -135,7 +150,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     const { error: pollError } = await supabase
       .from('polls')
       .delete()
-      .eq('id', params.id);
+      .eq('id', id);
 
     if (pollError) {
       return NextResponse.json({ error: `Failed to delete poll: ${pollError.message}` }, { status: 500 });
