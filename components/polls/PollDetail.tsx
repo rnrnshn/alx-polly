@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { PollWithOptions } from '@/lib/types/database';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,9 +10,17 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
+import { getPollResults } from '@/lib/actions/polls';
 
 interface PollDetailProps {
   poll: PollWithOptions;
+}
+
+interface PollResult {
+  option_id: string;
+  option_text: string;
+  vote_count: number;
+  percentage: number;
 }
 
 interface VoteStats {
@@ -310,29 +318,71 @@ export function PollDetail({ poll }: PollDetailProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
   const [voterInfo, setVoterInfo] = useState<VoterInfo>({ name: '', email: '' });
+  const [pollResults, setPollResults] = useState<PollResult[]>([]);
+  const [isLoadingResults, setIsLoadingResults] = useState(true);
 
   const isExpired = Boolean(poll.expires_at && new Date(poll.expires_at) < new Date());
   const options = poll.poll_options || [];
 
-  // Memoized vote statistics calculation
-  // Note: Since the current PollWithOptions type doesn't include vote counts,
-  // we'll show 0 votes for now. In a real implementation, you'd want to
-  // either modify getPollById to include vote counts or create a separate
-  // function to fetch poll results.
+  // Fetch poll results on component mount
+  useEffect(() => {
+    const fetchResults = async () => {
+      setIsLoadingResults(true);
+      try {
+        const result = await getPollResults(poll.id);
+        if (result.success && result.data) {
+          setPollResults(result.data);
+        } else {
+          console.error('Failed to fetch poll results:', result.error);
+        }
+      } catch (error) {
+        console.error('Error fetching poll results:', error);
+      } finally {
+        setIsLoadingResults(false);
+      }
+    };
+
+    fetchResults();
+  }, [poll.id]);
+
+  // Memoized vote statistics calculation using real data
   const voteStats = useMemo((): VoteStats => {
-    const totalVotes = 0; // TODO: Fetch actual vote counts from database
-    const maxVotes = 0;
+    if (isLoadingResults || pollResults.length === 0) {
+      // Show loading state or fallback to 0 votes
+      const totalVotes = 0;
+      const maxVotes = 0;
+      
+      const optionsWithStats = options.map((option) => ({
+        id: option.id,
+        text: option.text,
+        voteCount: 0,
+        percentage: 0,
+        isLeading: false,
+      }));
+
+      return { totalVotes, maxVotes, optionsWithStats };
+    }
+
+    // Calculate real statistics from poll results
+    const totalVotes = pollResults.reduce((sum, result) => sum + Number(result.vote_count), 0);
+    const maxVotes = Math.max(...pollResults.map(result => Number(result.vote_count)), 0);
     
-    const optionsWithStats = options.map((option) => ({
-      id: option.id,
-      text: option.text,
-      voteCount: 0, // TODO: Fetch actual vote counts
-      percentage: 0,
-      isLeading: false,
-    }));
+    const optionsWithStats = options.map((option) => {
+      const result = pollResults.find(r => r.option_id === option.id);
+      const voteCount = result ? Number(result.vote_count) : 0;
+      const percentage = result ? Number(result.percentage) : 0;
+      
+      return {
+        id: option.id,
+        text: option.text,
+        voteCount,
+        percentage,
+        isLeading: voteCount === maxVotes && maxVotes > 0,
+      };
+    });
 
     return { totalVotes, maxVotes, optionsWithStats };
-  }, [options]);
+  }, [options, pollResults, isLoadingResults]);
 
   // Memoized handlers for better performance
   const handleOptionChange = useCallback((optionId: string, checked: boolean) => {
@@ -381,6 +431,16 @@ export function PollDetail({ poll }: PollDetailProps) {
       if (response.ok) {
         toast.success('Vote submitted successfully!');
         setHasVoted(true);
+        
+        // Refresh poll results after successful vote
+        try {
+          const resultsResponse = await getPollResults(poll.id);
+          if (resultsResponse.success && resultsResponse.data) {
+            setPollResults(resultsResponse.data);
+          }
+        } catch (error) {
+          console.error('Error refreshing poll results:', error);
+        }
       } else {
         toast.error(result.error || 'Failed to submit vote');
       }
