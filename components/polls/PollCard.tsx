@@ -23,7 +23,7 @@ export function PollCard({ poll }: PollCardProps) {
   const [pollResults, setPollResults] = useState<PollResult[]>([]);
   const [isLoadingResults, setIsLoadingResults] = useState(true);
   
-  const isExpired = poll.expires_at && new Date(poll.expires_at) > new Date();
+  const isExpired = Boolean(poll.expires_at && new Date(poll.expires_at) < new Date());
   
   // Ensure poll_options is always an array
   const options = poll.poll_options || [];
